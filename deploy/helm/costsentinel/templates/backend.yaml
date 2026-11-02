@@ -1,0 +1,64 @@
+{{- $r := .Release.Name }}
+{{- $dbUrl := ternary (printf "postgresql+psycopg2://costsentinel:%s@%s-postgres:5432/costsentinel" .Values.postgres.password $r) .Values.externalDatabaseUrl .Values.postgres.enabled }}
+{{- $redisUrl := ternary (printf "redis://%s-redis:6379/0" $r) .Values.externalRedisUrl .Values.redis.enabled }}
+{{- $vaultAddr := default (printf "http://%s-vault:8200" $r) .Values.vault.addr }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $r }}-backend
+type: Opaque
+stringData:
+  DATABASE_URL: {{ $dbUrl | quote }}
+  {{- if .Values.vault.dev.enabled }}
+  VAULT_TOKEN: {{ .Values.vault.dev.rootToken | quote }}
+  {{- else }}
+  VAULT_ROLE_ID: {{ .Values.vault.roleId | quote }}
+  VAULT_SECRET_ID: {{ .Values.vault.secretId | quote }}
+  {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $r }}-backend
+  labels: { app: {{ $r }}-backend }
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels: { app: {{ $r }}-backend }
+  template:
+    metadata:
+      labels: { app: {{ $r }}-backend }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "8000", prometheus.io/path: /metrics }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports: [{ containerPort: 8000, name: http }]
+          envFrom: [{ secretRef: { name: {{ $r }}-backend } }]
+          env:
+            - { name: REDIS_URL, value: {{ $redisUrl | quote }} }
+            - { name: VAULT_ADDR, value: {{ $vaultAddr | quote }} }
+            - { name: NVIDIA_MODEL, value: {{ .Values.nvidiaModel | quote }} }
+            - { name: DAILY_LLM_TOKENS, value: {{ .Values.rateLimits.dailyLlmTokens | quote }} }
+            - { name: MAX_UPLOAD_MB, value: {{ .Values.rateLimits.maxUploadMb | quote }} }
+            - { name: AGENT_MAX_STEPS, value: {{ .Values.agent.maxSteps | quote }} }
+            - { name: COMPACT_AT_TOKENS, value: {{ .Values.agent.compactAtTokens | quote }} }
+            - { name: REQUIRE_API_KEY, value: {{ ternary "1" "0" .Values.requireApiKey | quote }} }
+          readinessProbe: { httpGet: { path: /readyz, port: http }, periodSeconds: 10, failureThreshold: 3 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, initialDelaySeconds: 15, periodSeconds: 20 }
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }, { name: home, mountPath: /home/app }]
+      volumes:
+        - { name: tmp, emptyDir: { sizeLimit: 256Mi } }
+        - { name: home, emptyDir: { sizeLimit: 128Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $r }}-backend
+spec:
+  selector: { app: {{ $r }}-backend }
+  ports: [{ port: 8000, targetPort: http, name: http }]

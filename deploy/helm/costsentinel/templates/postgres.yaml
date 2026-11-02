@@ -1,0 +1,42 @@
+{{- if .Values.postgres.enabled }}
+{{- $r := .Release.Name }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $r }}-postgres
+stringData: { POSTGRES_PASSWORD: {{ .Values.postgres.password | quote }}, POSTGRES_USER: costsentinel, POSTGRES_DB: costsentinel }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $r }}-postgres
+spec:
+  serviceName: {{ $r }}-postgres
+  replicas: 1
+  selector:
+    matchLabels: { app: {{ $r }}-postgres }
+  template:
+    metadata:
+      labels: { app: {{ $r }}-postgres }
+    spec:
+      securityContext: { fsGroup: 70, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports: [{ containerPort: 5432 }]
+          envFrom: [{ secretRef: { name: {{ $r }}-postgres } }]
+          env: [{ name: PGDATA, value: /var/lib/postgresql/data/pgdata }]
+          readinessProbe: { exec: { command: [pg_isready, -U, costsentinel] }, periodSeconds: 5 }
+          resources: {{ toYaml .Values.postgres.resources | nindent 12 }}
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL], add: [CHOWN, SETUID, SETGID, FOWNER, DAC_OVERRIDE] } }
+          volumeMounts: [{ name: data, mountPath: /var/lib/postgresql/data }]
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: {{ .Values.postgres.storage }} } } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $r }}-postgres
+spec: { selector: { app: {{ $r }}-postgres }, ports: [{ port: 5432 }] }
+{{- end }}

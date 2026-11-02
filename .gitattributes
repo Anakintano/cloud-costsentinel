@@ -1,0 +1,10 @@
+# GitHub's language bar ignores YAML by default, which hides most of the DevOps stack
+# (Compose, Helm, Prometheus, Grafana provisioning, Actions). Count it.
+*.yml  linguist-detectable
+*.yaml linguist-detectable
+# Helm templates are Go templates, not plain YAML
+deploy/helm/**/templates/*.yaml linguist-language=Go-Template
+# keep docs and generated assets out of the stats
+docs/** linguist-documentation
+*.svg linguist-generated
+*.sh text eol=lf

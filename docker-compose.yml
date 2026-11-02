@@ -1,0 +1,74 @@
+# Local stack. Disk-bounded: log rotation + mem limits on everything, named volumes only, `make clean` wipes it.
+x-common: &common
+  restart: unless-stopped
+  logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+services:
+  vault:   # DEV MODE: in-memory, auto-unsealed, root token. Secrets vanish on restart -> `make seed`. Prod/K8s uses a real Vault.
+    <<: *common
+    image: hashicorp/vault:1.17
+    cap_add: [IPC_LOCK]
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-dev-root-token}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports: ["127.0.0.1:8200:8200"]
+    mem_limit: 384m
+    healthcheck: { test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"], interval: 5s, retries: 10 }
+
+  redis:   # rate-limit counters only; no persistence, bounded memory
+    <<: *common
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru", "--save", "", "--appendonly", "no"]
+    ports: ["127.0.0.1:6379:6379"]
+    mem_limit: 96m
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, retries: 10 }
+
+  postgres:
+    <<: *common
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: costsentinel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-costsentinel-dev}
+      POSTGRES_DB: costsentinel
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    ports: ["127.0.0.1:5432:5432"]
+    mem_limit: 384m
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U costsentinel"], interval: 5s, retries: 10 }
+
+  backend:
+    <<: *common
+    build: ./backend
+    image: costsentinel-backend:dev
+    depends_on: { vault: { condition: service_healthy }, redis: { condition: service_healthy }, postgres: { condition: service_healthy } }
+    environment:
+      DATABASE_URL: postgresql+psycopg2://costsentinel:${POSTGRES_PASSWORD:-costsentinel-dev}@postgres:5432/costsentinel
+      REDIS_URL: redis://redis:6379/0
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_TOKEN:-dev-root-token}
+      NVIDIA_MODEL: ${NVIDIA_MODEL:-nvidia/nemotron-3.5-lightning-30b-a3b}
+    ports: ["127.0.0.1:8000:8000"]
+    mem_limit: 1g
+
+  prometheus:   # retention is capped by size AND time so metrics can never fill the disk
+    <<: *common
+    image: prom/prometheus:v2.54.1
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.size=300MB", "--storage.tsdb.retention.time=3d"]
+    volumes: ["./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro", "promdata:/prometheus"]
+    ports: ["127.0.0.1:9090:9090"]
+    mem_limit: 256m
+
+  grafana:
+    <<: *common
+    image: grafana/grafana:11.2.0
+    environment: { GF_AUTH_ANONYMOUS_ENABLED: "true", GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer, GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:-admin}" }
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafdata:/var/lib/grafana
+    ports: ["127.0.0.1:3000:3000"]
+    mem_limit: 256m
+
+volumes:
+  pgdata:
+  promdata:
+  grafdata:

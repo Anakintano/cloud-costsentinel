@@ -1,0 +1,33 @@
+
+### spike: Compute x4 on d200-201
+alert: ('Compute', 'nelson1_spike', '2023-07-20', '2023-07-21', 9.1)
+   trial 0: FAIL service=False onset_date=True tools=['list_anomalies', 'get_series', 'compare_periods', 'compare_periods', 'compare_periods', 'ramp_onset'] tokens=22837 repaired=False still_ungrounded=[]
+      reply: **Likely cause:** The July 20-21 spend jump (peak z = 9.1) is a genuine level shift, not a gradual leak. The 30-day window before the alert averaged **$187 /day**; the 3-day alert window averaged **$463 /day**, a **+147 %** increase (Cohen’s d = 1.39). A changepoint analysis shows an **abrupt step** beginning **2023-06-19**, two days before the alert, meaning the spend had already risen from a $205 base to ~$171 / da
+   trial 1: PASS service=True onset_date=True tools=['list_anomalies', 'get_series', 'changepoint', 'ramp_onset', 'top_movers', 'compare_periods'] tokens=27726 repaired=True still_ungrounded=['100']
+      reply: **Likely cause:** The July 20-21 spend jump is a genuine level change, not a gradual leak. The changepoint analysis shows the pre-alert mean was **$187 /day** and the alert-window mean was **$612 /day** — a **227 % increase** (z-score 7.08 from the changepoint tool). The nelson1_spike alert fires after 9 consecutive abnormal days, and the ramp-onset tool indicates the rise actually began **2023-07-16** as a gradual c
+   trial 2: PASS service=True onset_date=True tools=['list_anomalies', 'get_series', 'changepoint', 'ramp_onset', 'top_movers', 'compare_periods'] tokens=27555 repaired=True still_ungrounded=['100']
+      reply: **Likely cause:** The July 20-21 spend jump is a genuine level-change anomaly. The changepoint analysis shows the mean spend jumped from **$185.86/day** (28 days before the alert) to **$612.38/day** during the alert window—a **229 % increase** (peak z-score 9.1). The top-mover on 2023-07-20 was the **Compute** service, which rose from a baseline of **$231.30** to **$705.34**, a delta of **$474.03** (100 % of the tota
+
+### leak: Storage +3%/day from d260
+alert: ('Storage', 'nelson1_spike', '2023-10-05', '2023-10-05', 6.76)
+   trial 0: PASS service=True onset_date=True tools=['list_anomalies', 'get_series', 'compare_periods', 'top_movers', 'ramp_onset', 'changepoint'] tokens=28281 repaired=True still_ungrounded=['212']
+      reply: **Likely cause:** The Oct 5 spike (z = 6.76, actual $453 vs. expected $158) was the peak of a gradual increase that began before the alert window. The series shows daily spend rising from ~$160 in late September to $453 on 2023-10-05, with the 7-day window before the alert (2023-09-28 to 2023-10-04) averaging $184 and the alert day itself jumping to $453.  **When it began:** The ramp-onset analysis identifies a gradu
+   trial 1: PASS service=True onset_date=True tools=['list_anomalies', 'get_series', 'compare_periods', 'changepoint', 'top_movers', 'ramp_onset'] tokens=24150 repaired=False still_ungrounded=[]
+      reply: **Likely cause:** An abrupt level-change anomaly began on **2023-09-22** (the changepoint’s first-day-of-new-level), not on the alert day 2023-10-05. Comparing the 30-day window before that shift (mean $128.93/day) with the 7-day window after it (mean $265.77/day) shows a **~70 % increase** (Cohen’s d = 1.44, p ≈ 0.02). The Nelson-1 spike on 2023-10-05 (z = 6.76) was therefore a *late* detection of a step that had al
+   trial 2: PASS service=True onset_date=True tools=['list_anomalies', 'get_series', 'changepoint', 'ramp_onset', 'top_movers', 'top_movers'] tokens=28416 repaired=True still_ungrounded=[]
+      reply: **Investigation of anomaly #43 (Storage, nelson1_spike, 2023-10-05)**    - **Did spend really change?** Yes. The daily series shows the 2023-10-05 actual at 453.3 USD versus the expected 158.3 USD (z-score 6.76). Comparing the 28-day window before the alert (2023-09-07 → 2023-10-04, mean ≈ 166 USD) against the alert day itself demonstrates a genuine jump; the changepoint tool reports a mean after 2023-09-22 of 211.58
+
+### REAL: organic Nov-2023 shift (+28%, no injected truth)
+alert: ('TOTAL', 'nelson1_spike', '2023-11-01', '2023-11-02', 4.53)
+   trial 0: PASS service=True onset_date=True tools=['list_anomalies', 'get_series', 'compare_periods', 'compare_periods', 'compare_periods', 'compare_periods'] tokens=25265 repaired=False still_ungrounded=[]
+      reply: **Likely cause:** The 2023-11-01 to 2023-11-02 spend jumped to $1,475.80 and $1,525.60, a ~25 % rise over the 7-day baseline (Oct 25-31 mean $1,046.01). The changepoint test confirms the level shift is real (p ≈ 0.01), and the z-scores of 4.1-4.53 are far above the forecast’s expectation.  **When it began:** The alert fires on the first two days of the rise; the baseline window (Oct 25-31) already shows the pre-alert
+   trial 1: PASS service=True onset_date=True tools=['list_anomalies', 'get_series', 'compare_periods', 'compare_periods', 'compare_periods', 'ramp_onset'] tokens=29740 repaired=True still_ungrounded=[]
+      reply: **Likely cause:** The November 1-2 spend jump is a genuine level shift, not a gradual leak. The 28-day window before the alert (2023-10-04 → 2023-10-27) averaged **$1,056.80/day**, while the alert window (2023-11-01 → 2023-11-02) averaged **$1,361.55/day**, a **+28.8 %** increase (Cohen’s d = 1.98, p ≈ 0.0001). A ramp-onset analysis shows the best-fitting shape is an **abrupt step** beginning **2023-10-27**, just 5 d
+   trial 2: PASS service=True onset_date=True tools=['list_anomalies', 'get_series', 'compare_periods', 'compare_periods', 'compare_periods', 'compare_periods'] tokens=29060 repaired=True still_ungrounded=['1,500.70', '1,041.50', '3,026.40']
+      reply: **Likely cause:** The 2023-11-01 to 2023-11-02 spike (peak z = 4.53) is a genuine level shift. The two alert days averaged **$1,500.70** daily, while the 28-day window immediately before the alert (2023-10-04 → 2023-10-31) averaged **$1,041.50** daily — a clear increase that the nelson1_spike rule correctly flagged.  **When it began:** The shift is abrupt; the pre-alert period was already stable, so the rise began on
+
+==== SUMMARY (pass = right service AND onset date within tolerance AND >=2 distinct tools)
+  2/3  spike: Compute x4 on d200-201
+  3/3  leak: Storage +3%/day from d260
+  3/3  REAL: organic Nov-2023 shift (+28%, no injected truth)
+done

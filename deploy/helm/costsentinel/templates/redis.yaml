@@ -1,0 +1,30 @@
+{{- if .Values.redis.enabled }}
+{{- $r := .Release.Name }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $r }}-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: {{ $r }}-redis }
+  template:
+    metadata:
+      labels: { app: {{ $r }}-redis }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 999, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: [redis-server, --maxmemory, 64mb, --maxmemory-policy, allkeys-lru, --save, "", --appendonly, "no"]
+          ports: [{ containerPort: 6379 }]
+          readinessProbe: { exec: { command: [redis-cli, ping] }, periodSeconds: 5 }
+          resources: {{ toYaml .Values.redis.resources | nindent 12 }}
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $r }}-redis
+spec: { selector: { app: {{ $r }}-redis }, ports: [{ port: 6379 }] }
+{{- end }}

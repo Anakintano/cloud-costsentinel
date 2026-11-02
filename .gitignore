@@ -1,0 +1,12 @@
+data/
+*.db
+__pycache__/
+.pytest_cache/
+uvicorn.log
+eval_result.txt
+.env*
+*.vhdx
+demo*.csv
+*.log
+node_modules/
+.venv/

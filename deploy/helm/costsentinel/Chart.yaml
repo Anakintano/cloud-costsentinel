@@ -1,0 +1,6 @@
+apiVersion: v2
+name: costsentinel
+description: Cloud cost anomaly detection (forecast + Six Sigma control charts) with a tool-using LLM agent
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

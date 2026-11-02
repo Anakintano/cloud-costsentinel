@@ -1,0 +1,30 @@
+image: { repository: costsentinel-backend, tag: dev, pullPolicy: IfNotPresent }
+replicas: 1
+nvidiaModel: nvidia/nemotron-3.5-lightning-30b-a3b
+
+rateLimits: { dailyLlmTokens: 200000, maxUploadMb: 50 }
+agent: { maxSteps: 6, compactAtTokens: 6000 }
+requireApiKey: false
+
+resources:
+  requests: { cpu: 250m, memory: 512Mi }
+  limits: { cpu: "1", memory: 1Gi }
+
+postgres:
+  enabled: true                # false -> point externalDatabaseUrl at a managed DB
+  password: costsentinel-dev   # DEV default. Production: set via --set / an external secret manager.
+  storage: 1Gi
+  resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { memory: 384Mi } }
+externalDatabaseUrl: ""
+
+redis:
+  enabled: true
+  resources: { requests: { cpu: 50m, memory: 32Mi }, limits: { memory: 96Mi } }
+externalRedisUrl: ""
+
+vault:
+  # dev.enabled runs an in-memory, auto-unsealed Vault for minikube demos ONLY. Production: external Vault + AppRole.
+  dev: { enabled: true, rootToken: dev-root-token }
+  addr: ""        # empty + dev.enabled -> in-cluster dev Vault
+  roleId: ""      # AppRole creds for a real Vault (stored in a Secret, injected as env)
+  secretId: ""
