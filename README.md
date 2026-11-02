@@ -151,7 +151,7 @@ flowchart LR
 | **Build** | Multi-stage Docker image; non-root (uid 10001); pip and build tools removed from the runtime | `backend/Dockerfile` |
 | **Test** | 49 pytest tests, including live Redis and Vault integration; offline detection and agent evaluations | `backend/tests/`, `backend/scripts/eval_*.py` |
 | **CI** | GitHub Actions: pytest with Redis and Vault service containers, buildx with layer cache, `helm lint` | `.github/workflows/ci.yml` |
-| **Security** | Trivy image scan plus repo scan for secrets and misconfiguration, failing on fixable HIGH/CRITICAL; Vault holds the LLM key; optional API-key auth | CI, `app/secrets.py` |
+| **Security** | Trivy (pinned container, not a third-party action): image scan plus repo scan for secrets and Kubernetes/Docker misconfiguration, failing on fixable HIGH/CRITICAL; Vault holds the LLM key; optional API-key auth | CI, `.trivyignore.yaml`, `app/secrets.py` |
 | **Release** | Image pushed to GHCR on `main`, tagged by commit SHA | CI |
 | **Deploy** | Docker Compose for local; Helm chart for Kubernetes (tested on Minikube) | `docker-compose.yml`, `deploy/helm/costsentinel/` |
 | **Database changes** | Alembic migrations at startup, serialised with a Postgres advisory lock | `backend/alembic/` |
@@ -199,7 +199,7 @@ Dataset: Kaggle `atharvgunjarge/cloud-cost-dataset`, 365 days, synthetic-looking
 
 - The agent score uses a **lenient rubric** (right service, onset date within tolerance, at least two distinct tools). Some replies still contain a wrong secondary claim (step vs ramp, rule semantics) or a leftover unverified figure. The table above was measured **before** the latest prompt changes and has not been re-run since.
 - The Kaggle data is synthetic. A FinOps FOCUS sample had only about 30 usable days and is rejected by the 84-day minimum.
-- The dev stack uses placeholders: Vault in dev mode (in-memory, re-seed after any recreate), a default Postgres password, Grafana `admin/admin`. There are no Kubernetes NetworkPolicies and no Terraform yet.
+- The dev stack uses placeholders: Vault in dev mode (in-memory, re-seed after any recreate), a default Postgres password, Grafana `admin/admin`. There are no Kubernetes NetworkPolicies and no Terraform yet. The in-cluster dev Vault and Postgres pods are not read-only-rootfs hardened; those three Trivy findings are recorded as path-scoped exceptions in `.trivyignore.yaml` (the backend and Redis pods are hardened and not excepted).
 - The UI has no API-key field, so with `REQUIRE_API_KEY=1` it can't call the API.
 
 <br>

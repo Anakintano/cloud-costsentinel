@@ -1,0 +1,13 @@
+# Scoped exceptions, by file. The backend and Redis pods are fully hardened and are NOT listed here.
+# The in-cluster Vault and Postgres are DEV conveniences (see README "Honest limits"); production should use an
+# external Vault and a managed database, so hardening these two pods is deliberately deferred.
+misconfigurations:
+  - id: KSV014
+    paths:
+      - deploy/helm/costsentinel/templates/postgres.yaml
+      - deploy/helm/costsentinel/templates/vault-dev.yaml
+    statement: dev-only datastore pods write to their root filesystem (postgres data dir, vault dev mode)
+  - id: KSV118
+    paths:
+      - deploy/helm/costsentinel/templates/vault-dev.yaml
+    statement: dev-mode Vault image starts as root and drops privileges itself
